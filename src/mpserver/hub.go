@@ -12,9 +12,10 @@ type hub struct {
 	// New room creation message
 	newRoom chan *createRoomMsg
 
-	// New room creation message
+	// Player join room message
 	joinRoom chan *joinRoomMsg
 
+	// On leave room message
 	leaveRoom chan *leaveRoomMsg
 
 	// Register requests from the connections.
@@ -66,8 +67,8 @@ func (h *hub) run() {
 			newPlayer := newPlayer(m.connection)
 			roomID := uuid.NewRandom().String()
 
-			room := &room{id: roomID, host: newPlayer, players: make(map[*connection]*player)}
-			room.AddPlayer(newPlayer)
+			room := newRoom(roomID, newPlayer)
+			go room.run()
 
 			h.rooms[roomID] = room
 
@@ -77,7 +78,7 @@ func (h *hub) run() {
 			roomID := m.roomID
 			room, exists := h.rooms[roomID]
 			if exists {
-				room.AddPlayer(player)
+				room.addPlayer <- player
 				m.roomChannel <- room
 			} else {
 				m.roomChannel <- nil
@@ -89,7 +90,7 @@ func (h *hub) run() {
 				delete(h.rooms, room.id)
 				room.Close()
 			} else {
-				room.RemovePlayer(m.connection)
+				room.removePlayer <- m.connection
 			}
 
 			m.successChannel <- true
