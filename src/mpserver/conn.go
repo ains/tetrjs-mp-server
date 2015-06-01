@@ -85,7 +85,7 @@ func (c *connection) reader() {
 		default:
 			// All other messages are handled by the room the player is in
 			if c.room != nil {
-
+				c.room.message <- &roomMessage{c, message}
 			}
 		}
 	}

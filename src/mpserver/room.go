@@ -3,7 +3,10 @@ package main
 import (
 	"encoding/json"
 	"math/rand"
+	"strconv"
 	"time"
+
+	"github.com/ains/gotetris"
 )
 
 func init() {
@@ -21,9 +24,14 @@ type room struct {
 	// Player join room message
 	removePlayer chan *connection
 
-	startGame chan *player
+	message chan *roomMessage
 
 	seed int32
+}
+
+type roomMessage struct {
+	connection *connection
+	message    *gameMessage
 }
 
 func newRoom(id string, host *player) *room {
@@ -31,7 +39,6 @@ func newRoom(id string, host *player) *room {
 		id:           id,
 		addPlayer:    make(chan *player),
 		removePlayer: make(chan *connection),
-		startGame:    make(chan *player),
 		players:      make(map[*connection]*player),
 		host:         host,
 	}
@@ -57,10 +64,34 @@ func (r *room) run() {
 				})
 				delete(r.players, c)
 			}
-		case _ = <-r.startGame:
-			r.seed = rand.Int31()
-
+		case m := <-r.message:
+			r.handleRoomMessage(m)
 		}
+	}
+}
+
+func (r *room) handleRoomMessage(m *roomMessage) {
+	player := r.GetPlayerForConnection(m.connection)
+	switch {
+	case m.message.MessageType == "requestGameStart":
+		r.seed = rand.Int31()
+		r.BroadcastMessage("gameStarted", map[string]interface{}{
+			"seed": r.seed,
+		})
+	case m.message.MessageType == "move":
+		position := m.message.Data["position"]
+		rotation := m.message.Data["rotation"]
+
+		pos, _ := strconv.Atoi(position)
+		rot, _ := strconv.Atoi(rotation)
+
+		player.board = gotetris.DropPiece(player.board, gotetris.PieceMap['L'], pos, rot)
+		player.board.OutputBoard()
+		r.BroadcastMessage("playerMoved", map[string]interface{}{
+			"playerID": player.id,
+			"rot":      rot,
+			"pos":      pos,
+		})
 	}
 }
 
@@ -68,9 +99,9 @@ func (r *room) GetPlayerForConnection(c *connection) *player {
 	return r.players[c]
 }
 
-func (r *room) BroadcastMessage(type_ string, data interface{}) {
+func (r *room) BroadcastMessage(messageType string, data interface{}) {
 	message := make(map[string]interface{})
-	message["type"] = type_
+	message["type"] = messageType
 	message["data"] = data
 
 	jsonStr, _ := json.Marshal(message)
