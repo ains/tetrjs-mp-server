@@ -2,11 +2,14 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"go/build"
 	"log"
 	"net/http"
 	"path/filepath"
 	"text/template"
+
+	"github.com/ains/gotetris"
 )
 
 var (

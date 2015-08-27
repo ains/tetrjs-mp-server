@@ -23,8 +23,8 @@ type connection struct {
 }
 
 type gameMessage struct {
-	MessageType string            `json:"type"`
-	Data        map[string]string `json:"data"`
+	MessageType string                 `json:"type"`
+	Data        map[string]interface{} `json:"data"`
 }
 
 func decodeMessage(data []byte) (*gameMessage, error) {
@@ -67,7 +67,7 @@ func (c *connection) reader() {
 				"playerID": room.host.id,
 			})
 		case messageType == "joinRoom":
-			roomID, ok := message.Data["roomID"]
+			roomID, ok := message.Data["roomID"].(string)
 			if !ok {
 				continue
 			}
@@ -83,8 +83,10 @@ func (c *connection) reader() {
 				c.room = nil
 			}
 		default:
+			log.Println("other")
 			// All other messages are handled by the room the player is in
 			if c.room != nil {
+				log.Println("room")
 				c.room.message <- &roomMessage{c, message}
 			}
 		}
